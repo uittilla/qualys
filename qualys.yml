@@ -1,0 +1,60 @@
+app_banner: Qualys Vulnerability Tracking
+fullrun: False
+verbose: False
+use_proxy: False
+
+qualys_user:
+    user: ""
+    pass: ""
+
+qualys_links:
+    host_detection: "https://qualysapi.qualys.eu/api/2.0/fo/asset/host/vm/detection"
+    knowledge_base: "https://qualysapi.qualys.eu/api/2.0/fo/knowledge_base/vuln/"
+
+qualys_assets:
+  - List of Qualys Assets
+
+nvd:
+    url: https://nvd.nist.gov/feeds/json/cve/1.1/{}.gz
+    all_files:
+        - nvdcve-1.1-recent.json
+        - nvdcve-1.1-modified.json
+        - nvdcve-1.1-2018.json
+        - nvdcve-1.1-2017.json
+        - nvdcve-1.1-2016.json
+        - nvdcve-1.1-2015.json
+        - nvdcve-1.1-2014.json
+        - nvdcve-1.1-2013.json
+        - nvdcve-1.1-2012.json
+        - nvdcve-1.1-2011.json
+        - nvdcve-1.1-2010.json
+        - nvdcve-1.1-2009.json
+        - nvdcve-1.1-2008.json
+        - nvdcve-1.1-2007.json
+        - nvdcve-1.1-2006.json
+        - nvdcve-1.1-2005.json
+        - nvdcve-1.1-2004.json
+        - nvdcve-1.1-2003.json
+        - nvdcve-1.1-2002.json
+    short_files:
+        - nvdcve-1.1-recent.json
+        - nvdcve-1.1-modified.json
+
+proxies:
+  http: http://gueainfrasquid01.skybet.net:3128
+  https: http://gueainfrasquid01.skybet.net:3128
+
+sql_queries:
+    create_cve_vectors_db: CREATE TABLE IF NOT EXISTS CveVectors (Id STRING PRIMARY KEY, Vector STRING, Cwe STRING)
+    insert_into_cve_vectors: INSERT OR REPLACE INTO CveVectors VALUES(?,?,?)
+    create_qualys_knowledge_base_db: CREATE TABLE IF NOT EXISTS QualysKB (Id STRING PRIMARY KEY, Hash dictionary)
+    insert_into_qualys_knowledge_base: INSERT OR REPLACE INTO QualysKB VALUES(?,?)
+    query_all_qualys: SELECT * FROM QualysKB LIMIT 1
+    query_qualys_knowledge_base: SELECT Hash FROM QualysKB WHERE id=?
+    query_nvd_cve: SELECT Vector FROM CveVectors WHERE Id=?
+    query_nvd_cwe: SELECT Cwe FROM CveVectors WHERE Id=?
+
+cvss2_pattern: 'CVSS:2.0/'
+cvss3_pattern: 'CVSS:3'
+cvss3_tag: 'CVSS:3.0'
+
