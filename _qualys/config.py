@@ -1,5 +1,17 @@
 import yaml
 
+
+def read_config_file(yaml_file):
+    config = {}
+    with open(yaml_file) as file:
+        try:
+            config = yaml.safe_load(file)
+        except yaml.YAMLError as exc:
+            print(exc)
+
+    return config
+
+
 class Config():
     def __init__(self, path, yaml):
         """
@@ -7,18 +19,8 @@ class Config():
         @param path: yml file path
         @param yaml: yml config file
         """
-        self.config =  self.read_config_file("/".join([path, yaml]))
+        self.config = read_config_file("/".join([path, yaml]))
         self.path = path
-
-    def read_config_file(self, yaml_file):
-        config = {}
-        with open(yaml_file) as file:
-            try:
-                config = yaml.safe_load(file)
-            except yaml.YAMLError as exc:
-                print(exc)
-
-        return config
 
     @property
     def data_path(self):
@@ -35,6 +37,10 @@ class Config():
     @property
     def knowledge_base_report_file(self):
         return self.data_path + "qualys_knowledge_base.xml"
+
+    @knowledge_base_report_file.setter
+    def knowledge_base_report_file(self, file):
+        return file
 
     @property
     def sqlite3_file(self):
@@ -139,3 +145,11 @@ class Config():
     @property
     def use_proxy(self):
         return self.config['use_proxy']
+
+    @property
+    def all_hosts(self):
+        return self.config['all_hosts']
+
+    @all_hosts.setter
+    def all_hosts(self, value):
+        self.config['all_hosts'] = value

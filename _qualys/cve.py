@@ -10,19 +10,19 @@ import os
 
 class Cve():
 
-    def __init__(self, config):
+    def __init__(self, config, sqllite, rest, exceptions):
         """
         Main entry
         @param config:
         @return:
         """
         self.config = config
-        self.database = self.config.sqlite3_file
-        self.sql = sqllite.SqlLite(self.database, config)
-        self.rest = rest.Rest(self.config, False, False, use_auth=False)
+        self.sql = sqllite.SqlLite(config.sqlite3_file, config)
+        self.rest = rest
+        self.exceptions = exceptions
 
         if config.verbose:
-            print("   *** Fetcing NVD")
+            print("   *** Fetching NVD")
 
         self.sql.create_db(self.config.create_cve_vectors_db)
 
@@ -32,6 +32,9 @@ class Cve():
         Gets the list of nvd files needed
         :return:
         """
+        if self.config.verbose:
+            print("Gets the list of nvd files")
+
         files = self.config.nvd["short_files"]
 
         if self.config.fullrun:
@@ -50,6 +53,8 @@ class Cve():
             print("     --| Fetching", self.config.nvd["url"].format(file))
 
         response = self.rest.get(self.config.nvd["url"].format(file), {"X-Requested-With": "Python"})
+        if response.status_code != 200:
+            raise self.exception.NVDApiException(response.status_code, response.text)
 
         self.save_file(f"{self.config.data_path}{file}", response)
         self.unarchive(f"{self.config.data_path}{file}")

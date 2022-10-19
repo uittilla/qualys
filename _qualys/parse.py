@@ -4,22 +4,19 @@ Parses the given reports and produces a distict list of vulnerable/ fixed hosts
 import json
 
 from datetime import datetime, timedelta
-from _qualys import sqllite
-from _qualys import cvss2
 from cvss import CVSS3
-
-
 
 class Parse():
 
-    def __init__(self, config):
+    def __init__(self, config, sqllite, cvss2):
         """
         Parse
         :param config:
         """
         self.sql = sqllite.SqlLite(config.sqlite3_file, config)
-        self.cvss = cvss2.Cvss2(config)
+        self.cvss = cvss2
         self.config = config
+
 
     def get_mappings(self, ip, vuln, qkb):
         """
@@ -29,7 +26,7 @@ class Parse():
         :param qkb:
         :return:
         """
-        new_vuln = {}
+        new_vuln = dict()
         new_vuln['ip']          = ip
         new_vuln['qid']         = vuln['QID']
         new_vuln['port']        = vuln['PORT'] if 'PORT' in vuln else 0
@@ -80,6 +77,7 @@ class Parse():
         qkb = tuple(self.sql.query(self.sql.sql_queries['qualys_kb'], id))
         return json.loads(qkb[0].decode('utf-8'))
 
+
     def extract_host_info(self, host_list):
         """
         1:M / H/N(V)
@@ -89,23 +87,44 @@ class Parse():
         :param host_list:
         :return:
         """
-        container = {}
+        container = dict()
         for host in host_list:
             if 'IP' in host:
                 for vuln in host['DETECTION_LIST']['DETECTION']:
                     if type(vuln) is dict:
-                        qkb      = self.get_qkb(vuln['QID'])
-                        wanted   = self.get_mappings(host['IP'], vuln, qkb)
+                        qkb = self.get_qkb(vuln['QID'])
+                        wanted = self.get_mappings(host['IP'], vuln, qkb)
 
-                        item_key = ":".join([str(wanted['ip']), str(wanted['qid']), str(wanted['port'])])
+                        if self.config.all_hosts:
+                            if wanted['qid'] not in container:
+                                container[wanted['qid']] = wanted
 
-                        container[item_key] = wanted
+                            if 'ip_list' not in container[wanted['qid']]:
+                                container[wanted['qid']]['ip_list'] = [ {
+                                    "ip": wanted['ip'],
+                                    "port": wanted['port'],
+                                    "status": wanted['status']
+                                } ]
+                            else:
+                                container[wanted['qid']]['ip_list'].append({
+                                        "ip": wanted['ip'],
+                                        "port": wanted['port'],
+                                        "status": wanted['status']
+                                    } )
 
+                        else:
+                            item_key = ":".join([str(wanted['ip']), str(wanted['qid']), str(wanted['port'])])
+                            container[item_key] = wanted
 
         return container
 
 
     def get_running_kernel(self, qkb):
+        """
+        Detect if this vuln affects the running kernel
+        :param qkb:
+        :return:
+        """
         if 'AFFECT_RUNNING_KERNEL' in qkb:
             return qkb['AFFECT_RUNNING_KERNEL']
 
@@ -149,7 +168,7 @@ class Parse():
 
     def get_cvss_base(self, vuln):
         """
-        Extract CVSS Base CVSS3 preffered
+        Extract CVSS Base CVSS3 preferred
         :param vuln:
         :return:
         """
@@ -166,7 +185,7 @@ class Parse():
 
     def get_cvss_temporal(self, vuln):
         """
-        Extract CVSS temporal CVSS3 preffered
+        Extract CVSS temporal CVSS3 preferred
         :param vuln:
         :return:
         """
@@ -180,7 +199,7 @@ class Parse():
 
     def get_cvss_vector(self, vuln):
         """
-        Extract the CVSS vector CVSS3 preffered
+        Extract the CVSS vector CVSS3 preferred
         :param vuln:
         :return:
         """
@@ -190,6 +209,7 @@ class Parse():
             return vuln['CVSS']['VECTOR_STRING']
 
         return 0
+
 
     def get_title(self, vuln):
         """
@@ -256,10 +276,11 @@ class Parse():
 
     def get_environmental_score(self, scores):
         """
-        Environmental is the preffered score
-        @param score:
+        Environmental is the preferred score
+        @param scores:
         @return:
         """
+        score = 0
         if 'environmental' in scores:
             score = float(scores['environmental'])
         elif 'temporal' in scores:
@@ -291,10 +312,10 @@ class Parse():
     def get_scores(self, vector):
         """
         Use vector to obtain CVSS scoring
-        @param job:
+        @param vector:
         @return:
         """
-        if vector != None:
+        if vector is not None:
             if vector.startswith(self.config.cvss3_pattern):
                 c = CVSS3(vector)
             else:

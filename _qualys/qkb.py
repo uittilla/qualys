@@ -9,19 +9,16 @@ import xmltodict
 
 class Qkb():
 
-    def __init__(self, config):
+    def __init__(self, config, sqllite, rest, exceptions):
         """
         @param config:
         @return:
         """
         self.config   = config
-        self.database = self.config.sqlite3_file
-        self.sql      = sqllite.SqlLite(self.database, config)
-        self.rest     = rest.Rest(self.config,
-                              self.config.qualys_user['user'],
-                              self.config.qualys_user['pass'],
-                              use_auth=True)
+        self.sql      = sqllite.SqlLite(config.sqlite3_file, config)
+        self.rest     = rest
         self.qkb_db = {}
+        self.exceptions = exceptions
 
         if config.verbose:
             print("  *** Fetcing QKB")
@@ -47,19 +44,17 @@ class Qkb():
         self.sql.save_many(self)
         self.sql.close()
 
-        #os.remove(f"{self.config.data_path}qkb.xml")
-        #os.remove(self.config.shelve_db)
+
 
 
     def get_xml(self):
         """
         Downloads the qualys knowledge base XML file (big file)
         URL accepts param &last_modified_after=(date seven days ago) for quicker parsing
-        :param use_proxy:
         :return:
         """
-        if os.path.isfile(f"{self.config.data_path}qkb.xml"):
-            print("*** File qkb.xml exists, skipping")
+        if os.path.isfile(self.config.knowledge_base_report_file):
+            print(f"*** File {self.config.knowledge_base_report_file} exists, skipping")
             return
 
         today = DT.date.today()
@@ -70,12 +65,15 @@ class Qkb():
             query = "action=list&details=All"
 
         if self.config.verbose:
-            print("Fetching", "?".join((self.config.qualys_links['knowledge_base'], query)))
+            print("     --| Fetching", "?".join((self.config.qualys_links['knowledge_base'], query)))
 
         response = self.rest.get("?".join((self.config.qualys_links['knowledge_base'], query)),
                                 {"X-Requested-With": "Python"})
 
-        with open(f"{self.config.data_path}qkb.xml", 'wb') as file:
+        if response.status_code != 200:
+            raise self.exception.QualysApiException(response.status_code, response.text)
+
+        with open(self.config.knowledge_base_report_file, 'wb') as file:
             file.write(response.content)
 
 
@@ -96,7 +94,10 @@ class Qkb():
         @Key: QID
         @return:
         """
-        with open(f"{self.config.data_path}qkb.xml", "r") as f:
+        if self.config.verbose:
+            print(f"Converting {self.config.knowledge_base_report_file} to dictionary")
+
+        with open(self.config.knowledge_base_report_file, "r") as f:
             xmltodict.parse(f.read(), item_depth=4, item_callback=self.transform_item)
 
         if self.config.verbose:

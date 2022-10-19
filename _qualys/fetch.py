@@ -8,43 +8,33 @@ import sys
 import xmltodict
 import datetime as DT
 
-from _qualys import cve
-from _qualys import qkb
-from _qualys import rest
-
 class Fetch():
 
-    def __init__(self, config):
+    def __init__(self, config, rest, exceptions):
         """
         FETCH
         :param config:
         """
         self.config = config
-        self.rest = rest.Rest(self.config,
-                              self.config.qualys_user['user'],
-                              self.config.qualys_user['pass'],
-                              use_auth=True)
+        self.rest = rest
+        self.exception = exceptions
 
-        """ Remain upo to date or fail at matching information """
-        try:
-            self.get_cve()
-            self.get_qkb()
-        except:
-            sys.exit("An error has occured while staying up to date")
 
-    def get_cve(self):
+    def get_cve(self, cve):
         """
         Get NVD CVE information
         :return:
         """
-        return cve.Cve(self.config).run()
+        return cve.run()
 
-    def get_qkb(self):
+
+    def get_qkb(self, qkb):
         """
         Get Qualys Knowledge base
         :return:
         """
-        return qkb.Qkb(self.config).run()
+        return qkb.run()
+
 
     def get_host_detection_report(self):
         """
@@ -61,7 +51,7 @@ class Fetch():
         if self.config.verbose:
             print("*** Fetching Qualys hosts detections")
 
-        with self.rest._session.request("POST",
+        with self.rest.get_session().request("POST",
                  self.config.host_detection_link,
                  stream=True,
                  headers={"X-Requested-With": "Python"},
@@ -78,6 +68,9 @@ class Fetch():
                  }
             ) as r:
 
+            if r.status_code != 200:
+                raise self.exception.QualysApiException(r.status_code, r.text)
+
             with open(self.config.asset_report_file, "wb") as f:
                 for chunk in r.iter_content(chunk_size=20480):
                     f.write(chunk)
@@ -92,3 +85,7 @@ class Fetch():
             detections = xmltodict.parse(f.read())
 
         return detections
+
+    def clean_up(self):
+        os.remove(self.config.asset_report_file)
+        os.remove(self.config.knowledge_base_report_file)
